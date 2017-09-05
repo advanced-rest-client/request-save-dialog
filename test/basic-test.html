@@ -1,0 +1,461 @@
+<!doctype html>
+<!--
+@license
+Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+
+    <script src="../../webcomponentsjs/webcomponents-lite.js"></script>
+    <script src="../../web-component-tester/browser.js"></script>
+    <script src="../../iron-test-helpers/test-helpers.js"></script>
+    <script src="../../iron-test-helpers/mock-interactions.js"></script>
+    <script src="database-helper.js"></script>
+    <link rel="import" href="../request-save-dialog.html">
+  </head>
+  <body>
+
+    <test-fixture id="basic">
+      <template>
+        <request-save-dialog></request-save-dialog>
+      </template>
+    </test-fixture>
+
+    <script>
+    /* global DatabaseHelper, fixture, assert, sinon, TestHelpers */
+    const REQUESTNAME = 'test-request-name';
+    suite('basic', function() {
+
+      suiteSetup(function() {
+        return DatabaseHelper.createProjects();
+      });
+
+      suiteTeardown(function() {
+        return DatabaseHelper.deleteProjects();
+      });
+
+      var element;
+      setup(function() {
+        element = fixture('basic');
+      });
+
+      test('name is empty', function() {
+        assert.notOk(element.name);
+      });
+
+      test('isSaved is false by default', function() {
+        assert.isFalse(element.isSaved);
+      });
+
+      test('isDrive is false', function() {
+        // set via checkbox
+        assert.isFalse(element.isDrive);
+      });
+
+      test('isProject is false', function() {
+        // set via checkbox
+        assert.isFalse(element.isProject);
+      });
+
+      test('projectName is undefined', function() {
+        // It's not in the UI at this point
+        assert.isUndefined(element.projectName);
+      });
+
+      test('projectIsNew is not computed', function() {
+        assert.isUndefined(element.projectIsNew);
+      });
+
+      test('projectId is undefined', function() {
+        assert.isUndefined(element.projectId);
+      });
+
+      test('override is undefined', function() {
+        assert.isUndefined(element.override);
+      });
+
+      test('projectInfo getter is undefined', function() {
+        assert.isUndefined(element.projectInfo);
+      });
+
+      test('Updates the list of projects', function() {
+        return element._updateProjectsList({
+          target: element
+        })
+        .then(() => {
+          assert.typeOf(element.projects, 'array');
+          assert.lengthOf(element.projects, 2);
+        });
+      });
+    });
+
+    suite('_projectsSortFn()', function() {
+      var element;
+      var array = [{
+        name: 'two',
+        order: 2
+      }, {
+        name: 'one',
+        order: 1
+      }, {
+        name: 'three',
+        order: 3
+      }];
+      setup(function() {
+        element = fixture('basic');
+      });
+
+      test('Should sort the array', function() {
+        array.sort(element._projectsSortFn);
+        assert.equal(array[0].name, 'one');
+        assert.equal(array[1].name, 'two');
+        assert.equal(array[2].name, 'three');
+      });
+    });
+
+    suite('_computeAutocomplete()', function() {
+      var element;
+      setup(function() {
+        element = fixture('basic');
+      });
+
+      const array = [{name: 'a'}, {name: 'b'}];
+
+      test('Returns undefined for undefined data in argument', function() {
+        var result = element._computeAutocomplete();
+        assert.isUndefined(result);
+      });
+
+      test('Returns undefined for empty data in argument', function() {
+        var result = element._computeAutocomplete([]);
+        assert.isUndefined(result);
+      });
+
+      test('Returns array for the input', function() {
+        var result = element._computeAutocomplete(array);
+        assert.typeOf(result, 'array');
+        assert.lengthOf(result, 2);
+      });
+
+      test('Returns list of strings as input\'s names properties', function() {
+        var result = element._computeAutocomplete(array);
+        assert.equal(result[0], 'a');
+        assert.equal(result[1], 'b');
+      });
+    });
+
+    suite('projectInfo()', function() {
+      var element;
+      setup(function() {
+        element = fixture('basic');
+      });
+      const array = [{name: 'a', _id: 'aa'}, {name: 'b', _id: 'bb'}];
+
+      test('Returns undefined when projects are not set', function() {
+        var result = element.projectInfo;
+        assert.isUndefined(result);
+      });
+
+      test('Returns undefined when project name is not set', function() {
+        element.projects = array;
+        var result = element.projectInfo;
+        assert.isUndefined(result);
+      });
+
+      test('Returns project info', function() {
+        element.projects = array;
+        element.projectName = 'a';
+        var result = element.projectInfo;
+        assert.deepEqual(result, array[0]);
+      });
+
+      test('Computes projectIsNew equals false', function() {
+        element.projects = array;
+        element.projectName = 'a';
+        assert.isFalse(element.projectIsNew);
+      });
+
+      test('Computes projectIsNew equals true', function() {
+        element.projects = array;
+        element.projectName = 'atest';
+        assert.isTrue(element.projectIsNew);
+      });
+    });
+
+    suite('_computeProjectName()', function() {
+      var element;
+      const array = [{name: 'a', _id: 'aa'}, {name: 'b', _id: 'bb'}];
+      setup(function() {
+        element = fixture('basic');
+        element.projects = array;
+      });
+
+      test('Project name is undefined', function() {
+        assert.isUndefined(element.projectName);
+      });
+
+      test('Project name is set', function() {
+        element.projectId = array[1]._id;
+        assert.equal(element.projectName, array[1].name);
+      });
+    });
+
+    suite('_projectIsNewChanged()', function() {
+      var element;
+      const array = [{name: 'a', _id: 'aa'}, {name: 'b', _id: 'bb'}];
+      setup(function() {
+        element = fixture('basic');
+        element.projects = array;
+      });
+
+      test('Sets the project id', function() {
+        element.projectName = 'a';
+        assert.equal(element.projectId, 'aa');
+      });
+    });
+
+    suite('save-new flow', function() {
+
+      suiteSetup(function() {
+        return DatabaseHelper.createProjects();
+      });
+
+      suiteTeardown(function() {
+        return DatabaseHelper.deleteProjects();
+      });
+
+      var element;
+      setup(function() {
+        element = fixture('basic');
+        element.name = REQUESTNAME;
+        TestHelpers.forceXIfStamp(element);
+      });
+
+      test('Override button is not rendered', function() {
+        var node = Polymer.dom(element.root).querySelector('[data-action="override"]');
+        assert.notOk(node);
+      });
+
+      test('Save as new button is not rendered', function() {
+        var node = Polymer.dom(element.root).querySelector('[data-action="save-new"]');
+        assert.notOk(node);
+      });
+
+      test('Save button is rendered', function() {
+        var node = Polymer.dom(element.root).querySelector('[data-action="save"]');
+        assert.ok(node);
+      });
+
+      test('Sets override to false', function() {
+        element._save();
+        assert.isFalse(element.override);
+      });
+
+      test('fires `save-request` custom event', function() {
+        var spy = sinon.spy();
+        element.addEventListener('save-request', spy);
+        element._save();
+        assert.isTrue(spy.calledOnce);
+      });
+
+      test('Computes detail for `save-request` custom event', function() {
+        var detail;
+        element.addEventListener('save-request', function(e) {
+          detail = e.detail;
+        });
+        element._save();
+        assert.typeOf(detail, 'object', 'Detail is an object');
+        assert.equal(detail.name, REQUESTNAME, 'Request name is set');
+        assert.isFalse(detail.override, 'override is false');
+        assert.isFalse(detail.isDrive, 'isDrive is false');
+        assert.isFalse(detail.isProject, 'isProject is false');
+        assert.isUndefined(detail.projectId, 'projectId is undefined');
+        assert.isUndefined(detail.projectIsNew, 'projectIsNew is undefined');
+        assert.isUndefined(detail.projectName, 'projectName is undefined');
+      });
+    });
+
+    suite('save-new from existing flow', function() {
+
+      suiteSetup(function() {
+        return DatabaseHelper.createProjects();
+      });
+
+      suiteTeardown(function() {
+        return DatabaseHelper.deleteProjects();
+      });
+
+      var element;
+      setup(function() {
+        element = fixture('basic');
+        element.isSaved = true;
+        element.name = REQUESTNAME;
+        TestHelpers.forceXIfStamp(element);
+      });
+
+      test('Override button is rendered', function() {
+        var node = Polymer.dom(element.root).querySelector('[data-action="override"]');
+        assert.ok(node);
+      });
+
+      test('Save as new button is rendered', function() {
+        var node = Polymer.dom(element.root).querySelector('[data-action="save-new"]');
+        assert.ok(node);
+      });
+
+      test('Save button is not rendered', function() {
+        var node = Polymer.dom(element.root).querySelector('[data-action="save"]');
+        assert.notOk(node);
+      });
+
+      test('Sets override to false', function() {
+        element._save();
+        assert.isFalse(element.override);
+      });
+
+      test('fires `save-request` custom event', function() {
+        var spy = sinon.spy();
+        element.addEventListener('save-request', spy);
+        element._save();
+        assert.isTrue(spy.calledOnce);
+      });
+
+      test('Computes detail for `save-request` custom event', function() {
+        var detail;
+        element.addEventListener('save-request', function(e) {
+          detail = e.detail;
+        });
+        element._save();
+        assert.typeOf(detail, 'object', 'Detail is an object');
+        assert.equal(detail.name, REQUESTNAME, 'Request name is set');
+        assert.isFalse(detail.override, 'override is false');
+        assert.isFalse(detail.isDrive, 'isDrive is false');
+        assert.isFalse(detail.isProject, 'isProject is false');
+        assert.isUndefined(detail.projectId, 'projectId is undefined');
+        assert.isUndefined(detail.projectIsNew, 'projectIsNew is undefined');
+        assert.isUndefined(detail.projectName, 'projectName is undefined');
+      });
+    });
+
+    suite('override flow', function() {
+      suiteSetup(function() {
+        return DatabaseHelper.createProjects();
+      });
+
+      suiteTeardown(function() {
+        return DatabaseHelper.deleteProjects();
+      });
+
+      var element;
+      setup(function() {
+        element = fixture('basic');
+        element.isSaved = true;
+        element.name = REQUESTNAME;
+        TestHelpers.forceXIfStamp(element);
+      });
+
+      test('Sets override to false', function() {
+        element._override();
+        assert.isTrue(element.override);
+      });
+
+      test('Computes detail for `save-request` custom event', function() {
+        var detail;
+        element.addEventListener('save-request', function(e) {
+          detail = e.detail;
+        });
+        element._override();
+        assert.typeOf(detail, 'object', 'Detail is an object');
+        assert.equal(detail.name, REQUESTNAME, 'Request name is set');
+        assert.isTrue(detail.override, 'override is true');
+        assert.isFalse(detail.isDrive, 'isDrive is false');
+        assert.isFalse(detail.isProject, 'isProject is false');
+        assert.isUndefined(detail.projectId, 'projectId is undefined');
+        assert.isUndefined(detail.projectIsNew, 'projectIsNew is undefined');
+        assert.isUndefined(detail.projectName, 'projectName is undefined');
+      });
+    });
+
+    const PROJECT_NAME = 'test-project';
+    suite('Adding to new project flow', function() {
+      suiteSetup(function() {
+        return DatabaseHelper.createProjects();
+      });
+
+      suiteTeardown(function() {
+        return DatabaseHelper.deleteProjects();
+      });
+
+      var element;
+      setup(function() {
+        element = fixture('basic');
+        element.name = REQUESTNAME;
+        element.isProject = true;
+        element.projectName = PROJECT_NAME;
+        TestHelpers.forceXIfStamp(element);
+      });
+
+      test('Computes detail for `save-request` custom event', function() {
+        var detail;
+        element.addEventListener('save-request', function(e) {
+          detail = e.detail;
+        });
+        element._save();
+        assert.typeOf(detail, 'object', 'Detail is an object');
+        assert.equal(detail.name, REQUESTNAME, 'Request name is set');
+        assert.isFalse(detail.override, 'override is false');
+        assert.isFalse(detail.isDrive, 'isDrive is false');
+        assert.isTrue(detail.isProject, 'isProject is true');
+        assert.isUndefined(detail.projectId, 'projectId is undefined');
+        assert.isTrue(detail.projectIsNew, 'projectIsNew is true');
+        assert.equal(detail.projectName, PROJECT_NAME, 'projectName is set');
+      });
+    });
+
+    suite('Adding to existing project flow', function() {
+      suiteSetup(function() {
+        return DatabaseHelper.createProjects();
+      });
+
+      suiteTeardown(function() {
+        return DatabaseHelper.deleteProjects();
+      });
+
+      var element;
+      const array = [{name: 'a', _id: 'aa'}, {name: 'b', _id: 'bb'}];
+      setup(function() {
+        element = fixture('basic');
+        element.projects = array;
+        element.name = REQUESTNAME;
+        element.isProject = true;
+        element.projectId = array[1]._id;
+        TestHelpers.forceXIfStamp(element);
+      });
+
+      test('Computes detail for `save-request` custom event', function() {
+        var detail;
+        element.addEventListener('save-request', function(e) {
+          detail = e.detail;
+        });
+        element._save();
+        assert.typeOf(detail, 'object', 'Detail is an object');
+        assert.equal(detail.name, REQUESTNAME, 'Request name is set');
+        assert.isFalse(detail.override, 'override is false');
+        assert.isFalse(detail.isDrive, 'isDrive is false');
+        assert.isTrue(detail.isProject, 'isProject is true');
+        assert.equal(detail.projectId, array[1]._id, 'projectId is set');
+        assert.isFalse(detail.projectIsNew, 'projectIsNew is false');
+        assert.isUndefined(detail.projectName, 'projectName is undefined');
+      });
+    });
+    </script>
+
+  </body>
+</html>
